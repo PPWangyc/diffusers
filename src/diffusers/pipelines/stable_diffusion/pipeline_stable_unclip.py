@@ -174,9 +174,11 @@ class StableUnCLIPPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraL
         num_images_per_prompt,
         do_classifier_free_guidance,
         text_model_output: Optional[Union[CLIPTextModelOutput, Tuple]] = None,
+        prompt_embeds: Optional[torch.FloatTensor] = None,
+        text_last_hidden_state: Optional[torch.FloatTensor] = None,
         text_attention_mask: Optional[torch.Tensor] = None,
     ):
-        if text_model_output is None:
+        if text_model_output is None and prompt is not None:
             batch_size = len(prompt) if isinstance(prompt, list) else 1
             # get prompt text embeddings
             text_inputs = self.prior_tokenizer(
@@ -209,9 +211,14 @@ class StableUnCLIPPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraL
             text_enc_hid_states = prior_text_encoder_output.last_hidden_state
 
         else:
-            batch_size = text_model_output[0].shape[0]
-            prompt_embeds, text_enc_hid_states = text_model_output[0], text_model_output[1]
-            text_mask = text_attention_mask
+            if text_model_output is not None:
+                batch_size = text_model_output[0].shape[0]
+                prompt_embeds, text_enc_hid_states = text_model_output[0], text_model_output[1]
+                text_mask = text_attention_mask
+            else:
+                batch_size = prompt_embeds.shape[0]
+                text_enc_hid_states = text_last_hidden_state
+                text_mask = text_attention_mask
 
         prompt_embeds = prompt_embeds.repeat_interleave(num_images_per_prompt, dim=0)
         text_enc_hid_states = text_enc_hid_states.repeat_interleave(num_images_per_prompt, dim=0)
@@ -780,15 +787,15 @@ class StableUnCLIPPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraL
         prior_do_classifier_free_guidance = prior_guidance_scale > 1.0
 
         # 3. Encode input prompt
-        if prompt_embeds is None:
-            prior_prompt_embeds, prior_text_encoder_hidden_states, prior_text_mask = self._encode_prior_prompt(
-                prompt=prompt,
-                device=device,
-                num_images_per_prompt=num_images_per_prompt,
-                do_classifier_free_guidance=prior_do_classifier_free_guidance,
-            )
-        else:
-            prior_prompt_embeds, prior_text_encoder_hidden_states, prior_text_mask = prompt_embeds, encoder_hidden_states, embeds_mask
+        prior_prompt_embeds, prior_text_encoder_hidden_states, prior_text_mask = self._encode_prior_prompt(
+            prompt=prompt,
+            device=device,
+            num_images_per_prompt=num_images_per_prompt,
+            do_classifier_free_guidance=prior_do_classifier_free_guidance,
+            prompt_embeds=prompt_embeds,
+            text_last_hidden_state = encoder_hidden_states,
+            text_attention_mask = embeds_mask,
+        )
 
         # 4. Prepare prior timesteps
         self.prior_scheduler.set_timesteps(prior_num_inference_steps, device=device)
