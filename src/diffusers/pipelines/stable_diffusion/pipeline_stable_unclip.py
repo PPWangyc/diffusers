@@ -669,6 +669,8 @@ class StableUnCLIPPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraL
         prior_guidance_scale: float = 4.0,
         prior_latents: Optional[torch.FloatTensor] = None,
         clip_skip: Optional[int] = None,
+        encoder_hidden_states: Optional[torch.FloatTensor] = None,
+        embeds_mask: Optional[torch.BoolTensor] = None,
     ):
         """
         The call function to the pipeline for generation.
@@ -778,7 +780,7 @@ class StableUnCLIPPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraL
         prior_do_classifier_free_guidance = prior_guidance_scale > 1.0
 
         # 3. Encode input prompt
-        if not prompt_embeds:
+        if prompt_embeds is None:
             prior_prompt_embeds, prior_text_encoder_hidden_states, prior_text_mask = self._encode_prior_prompt(
                 prompt=prompt,
                 device=device,
@@ -786,7 +788,7 @@ class StableUnCLIPPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraL
                 do_classifier_free_guidance=prior_do_classifier_free_guidance,
             )
         else:
-            print("Using provided prompt embeds")
+            prior_prompt_embeds, prior_text_encoder_hidden_states, prior_text_mask = prompt_embeds, encoder_hidden_states, embeds_mask
 
         # 4. Prepare prior timesteps
         self.prior_scheduler.set_timesteps(prior_num_inference_steps, device=device)
