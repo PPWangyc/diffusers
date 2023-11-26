@@ -778,12 +778,15 @@ class StableUnCLIPPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraL
         prior_do_classifier_free_guidance = prior_guidance_scale > 1.0
 
         # 3. Encode input prompt
-        prior_prompt_embeds, prior_text_encoder_hidden_states, prior_text_mask = self._encode_prior_prompt(
-            prompt=prompt,
-            device=device,
-            num_images_per_prompt=num_images_per_prompt,
-            do_classifier_free_guidance=prior_do_classifier_free_guidance,
-        )
+        if not prompt_embeds:
+            prior_prompt_embeds, prior_text_encoder_hidden_states, prior_text_mask = self._encode_prior_prompt(
+                prompt=prompt,
+                device=device,
+                num_images_per_prompt=num_images_per_prompt,
+                do_classifier_free_guidance=prior_do_classifier_free_guidance,
+            )
+        else:
+            print("Using provided prompt embeds")
 
         # 4. Prepare prior timesteps
         self.prior_scheduler.set_timesteps(prior_num_inference_steps, device=device)
